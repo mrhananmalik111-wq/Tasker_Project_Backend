@@ -1,5 +1,6 @@
 const express = require('express')
 const cors = require("cors");
+const mongoose = require("mongoose");
 const CardModel = require("./models/card_model")
 const app = express()
 
@@ -14,23 +15,41 @@ const connecting = require("./common/connect")
 
 const port = process.env.PORT || 3300;
 
-// Middleware
+// ============== MIDDLEWARE ==============
 app.use(express.json())
 app.use(cors())
 app.use("/uploads", express.static("uploads"));
 
-// Routes
+// ============== DEBUG ROUTE (MUST BE FIRST) ==============
+app.get("/api/test", (req, res) => {
+  res.json({
+    status: "OK",
+    message: "Server is running on Vercel!",
+    mongodb: mongoose.connection.readyState === 1 ? "Connected" : "Not Connected",
+    env: process.env.MONGO_URI ? "MONGO_URI is set" : "MONGO_URI is NOT set",
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ============== ROUTES ==============
 app.use("/api/v1/createCard", createCard);
 app.use("/api/v1/user", signupROUTER)
 app.use("/api/v1/login", loginROUTER)
 app.use("/api/v1/category", categoryROUTER)
 app.use("/api/v1/status", statusROUTER)
 
-// ============== FIXED GET ROUTES ==============
+// ============== GET ROUTES WITH BETTER ERROR HANDLING ==============
 
 // For Navbar
 app.get("/api/v1/tasks/get", async (req, res) => {
   try {
+    // Check database connection
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ 
+        error: "Database not connected", 
+        readyState: mongoose.connection.readyState 
+      });
+    }
     const tasks = await CardModel.find({});
     res.status(200).json(tasks);
   } catch (error) {
@@ -42,6 +61,12 @@ app.get("/api/v1/tasks/get", async (req, res) => {
 // For AllTasks & Fetch_Data
 app.get("/api/v1/createCard/getAll", async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ 
+        error: "Database not connected", 
+        readyState: mongoose.connection.readyState 
+      });
+    }
     const cards = await CardModel.find({});
     res.status(200).json(cards);
   } catch (error) {
@@ -53,6 +78,9 @@ app.get("/api/v1/createCard/getAll", async (req, res) => {
 // Get single task
 app.get("/api/v1/task/:id", async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database not connected" });
+    }
     const task = await CardModel.findById(req.params.id);
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
@@ -67,6 +95,9 @@ app.get("/api/v1/task/:id", async (req, res) => {
 // Update task
 app.put("/api/v1/task/:id", async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database not connected" });
+    }
     const { Title, DueDate, DueTime, Description, Progress, Status, Category } = req.body;
     const updatedTask = await CardModel.findByIdAndUpdate(
       req.params.id,
@@ -86,6 +117,9 @@ app.put("/api/v1/task/:id", async (req, res) => {
 // Delete task
 app.delete("/api/v1/task/:id", async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database not connected" });
+    }
     const deletedTask = await CardModel.findByIdAndDelete(req.params.id);
     if (!deletedTask) {
       return res.status(404).json({ message: "Task not found" });
@@ -100,6 +134,9 @@ app.delete("/api/v1/task/:id", async (req, res) => {
 // Create form route
 app.post("/creatform", async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: "Database not connected" });
+    }
     const { Title, DueDate, DueTime, Description, Progress, Status, Category } = req.body;
     if (!Title || !DueDate || !DueTime || !Description || !Progress || !Status || !Category) {
       return res.status(400).json({ message: "Please fulfill all the required fields." });
@@ -130,6 +167,7 @@ if (require.main === module) {
       await connecting();
       app.listen(port, () => {
         console.log(`✅ Server running on port ${port}`);
+        console.log(`✅ MongoDB Status: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Not Connected'}`);
       });
     } catch (error) {
       console.error("❌ Failed to start server:", error.message);
