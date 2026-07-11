@@ -11,6 +11,19 @@ const categoryROUTER = require("./Routes/category_router")
 const statusROUTER = require("./Routes/status_route")
 
 require("dotenv").config();
+
+// ============== FORCE MONGO_URI FOR VERCEL ==============
+if (process.env.NODE_ENV === 'production') {
+  console.log("🚀 Running on Vercel");
+  console.log("📡 MONGO_URI Status:", process.env.MONGO_URI ? "✅ Set" : "❌ Not Set");
+  
+  // Agar MONGO_URI set nahi hai toh hardcode karo
+  if (!process.env.MONGO_URI) {
+    console.log("⚠️ MONGO_URI not set, using hardcoded value");
+    process.env.MONGO_URI = "mongodb+srv://mrhananmalik111_db_user:Malik1234@cluster0.4gljjvc.mongodb.net/Card?retryWrites=true&w=majority";
+  }
+}
+
 const connecting = require("./common/connect")
 
 const port = process.env.PORT || 3300;
@@ -26,6 +39,7 @@ app.get("/api/test", (req, res) => {
     status: "OK",
     message: "Server is running on Vercel!",
     mongodb: mongoose.connection.readyState === 1 ? "Connected" : "Not Connected",
+    readyState: mongoose.connection.readyState,
     env: process.env.MONGO_URI ? "MONGO_URI is set" : "MONGO_URI is NOT set",
     timestamp: new Date().toISOString()
   });
@@ -168,6 +182,7 @@ if (require.main === module) {
       app.listen(port, () => {
         console.log(`✅ Server running on port ${port}`);
         console.log(`✅ MongoDB Status: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Not Connected'}`);
+        console.log(`✅ Database Name: ${mongoose.connection.db ? mongoose.connection.db.databaseName : 'N/A'}`);
       });
     } catch (error) {
       console.error("❌ Failed to start server:", error.message);
